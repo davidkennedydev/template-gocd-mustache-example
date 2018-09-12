@@ -1,0 +1,124 @@
+  {{#deploy}}
+  {{#development}}
+  {{name}}-{{branch}}-deploy-dev:
+      group: SchemeTools
+      label_template: "${COUNT}"
+      locking: yes
+      materials:
+        upstream:
+          pipeline: {{name}}-{{branch}}-build
+          stage: PublishPackage
+      stages:
+        - FetchPackage:
+            approval: success
+            fetch_materials: no
+            keep_artifacts: no
+            clean_workspace: yes
+            jobs:
+              Chocolatey:
+                timeout: 10
+                resources:
+                  - windows
+                  - chocolatey
+                  - .net builder
+                tasks:
+                  - fetch:
+                      run_if: passed
+                      pipeline: {{name}}-{{branch}}-build
+                      stage: PublishPackage
+                      job: Chocolatey
+                      source: PackageFiles
+                  - exec:
+                      run_if: passed
+                      command: NupkgWrench
+                      arguments:
+                        - extract
+                        - "PackageFiles/*.nupkg"
+                        - --output
+                        - PackageFilesOutputTemp
+                  - exec:
+                      run_if: passed
+                      command: powershell
+                      arguments:
+                        - Copy-Item
+                        - -Path
+                        - (Get-Item PackageFilesOutputTemp\\*.nuspec).FullName
+                        - -Destination
+                        - PackageFiles\\application.nuspec
+                        - -Force
+                  - exec:
+                      run_if: passed
+                      command: powershell
+                      arguments:
+                        - Remove-Item
+                        - -Path
+                        - PackageFilesOutputTemp
+                        - -Force
+                        - -Recurse
+                artifacts:
+                  - build:
+                     source: "PackageFiles/**/*.*"
+                     destination: "PackageFiles"
+        - DeployPackage:
+            approval: success
+            fetch_materials: no
+            keep_artifacts: no
+            clean_workspace: yes
+            jobs:
+              Ansible:
+                elastic_profile_id: "docker.chocodeploy-dc1"
+                timeout: 10
+                secure_variables:
+                  "CHOCO_WINSERVICE_ACCOUNT_PASS": "{{password}}"
+                  {{#database}}
+                  "GOCD_MACHINE_VAR_Application:Database.Password": "{{password}}"
+                  {{/database}}
+                environment_variables:
+                      job: Chocolatey
+                      source: PackageFiles
+                  - exec:
+                      run_if: passed
+                      command: /bin/bash
+                      arguments:
+                      - -c
+                      - 'printf "ansible_user: $ANSIBLE_USER\\nansible_password: $ANSIBLE_PASSWORD" > /go/ansible-code3/inventories/group_vars/windows/secret.yml'
+                  - exec:
+                      run_if: passed
+                      working_directory: PackageFiles
+                      command: python
+                      arguments:
+                        - /go/ansible-code3/scripts/choco-vars-generator.py
+                        - -i
+                        - "application.nuspec"
+                        - -o
+                        - /go/ansible-code3/inventories/group_vars/windows/choco_vars.yml
+                  - exec:
+                      run_if: passed
+                      command: python
+                      arguments:
+                        - /go/ansible-code3/scripts/dump_msdeploy_json.py
+                        - -o
+                        - choco_params.json
+                        - -p
+                        - CHOCO_
+                        - -v
+                        - CHOCO_ENV_VAR_PARAMS
+                  - exec:
+                      run_if: passed
+                      command: python
+                      arguments:
+                        - /go/ansible-code3/scripts/dump_msdeploy_json.py
+                        - -o
+                        - machine_env_vars.json
+                        - -p
+                        - GOCD_MACHINE_VAR_
+                        - -v
+                        - MACHINE_ENV_VARS
+                  - exec:
+                      run_if: passed
+                      command: "/bin/bash"
+                      arguments:
+                     source: "machine_env_vars.json"
+                     destination: "DeployMetadata"
+  {{/development}}
+  {{/deploy}}

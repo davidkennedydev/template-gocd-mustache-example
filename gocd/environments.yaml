@@ -1,0 +1,5 @@
+environments:
+  Dev:
+    pipelines:
+      - ProjectName-main-build
+      - ProjectName-main-deploy-dev

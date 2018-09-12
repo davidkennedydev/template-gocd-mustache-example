@@ -1,0 +1,3 @@
+[submodule "template-gocd-pipeline-as-code"]
+	path = template-gocd-pipeline-as-code
+	url = ../template-gocd-pipeline-as-code.git

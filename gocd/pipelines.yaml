@@ -1,0 +1,32 @@
+project: 
+  name : ProjectName
+  build:
+    [
+      { 
+        branch: master, 
+        unit-test: true,
+        code-coverage: true,
+        publish: true
+      },
+    ]
+  deploy:
+    [
+      {
+        branch: master,
+        environment: dev,
+        servers: 
+          [
+            10.152.20.57
+          ],
+        url: "http://+:1234/",
+        user: "UserName@location.local",
+        password: "Password==",
+        logger:
+        {
+          accumulation_period_in_seconds: 0.25,
+          maximum_entries_per_second: 10,
+          minimum_log_severity: "Info",
+          request_time_out_in_seconds: 10
+        }
+      }
+    ]
